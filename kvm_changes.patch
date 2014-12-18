@@ -1,0 +1,37 @@
+From 17a39f8f5ab0ac57cf13fc525c0b48927e959f03 Mon Sep 17 00:00:00 2001
+From: Yasser Shalabi <yassershalabi@gmail.com>
+Date: Wed, 19 Nov 2014 20:26:34 -0600
+Subject: [PATCH] hypervisor change to resume immediately when it sees one of
+ our fake vmexits
+
+---
+ arch/x86/kvm/vmx.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/kvm/vmx.c b/arch/x86/kvm/vmx.c
+index 064d0be..a2eb77b 100644
+--- a/arch/x86/kvm/vmx.c
++++ b/arch/x86/kvm/vmx.c
+@@ -6579,7 +6579,18 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
+ 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+ 	u32 exit_reason = vmx->exit_reason;
+ 	u32 vectoring_info = vmx->idt_vectoring_info;
+-
++	//code for simulated exits
++	u64 rdx = 0;
++	if(exit_reason == EXIT_REASON_VMCALL){
++		rdx = kvm_register_read(vcpu, VCPU_REGS_RDX);
++		if(rdx == 0xdeadbeefffffFFFF){
++			//skip the instruction triggering the exit
++			//otherwise we will just exit again on resume
++			//forever... and ever
++			skip_emulated_instruction(vcpu);
++			return 1;
++		}
++	}
+ 	/* If guest state is invalid, start emulating */
+ 	if (vmx->emulation_required)
+ 		return handle_invalid_guest_state(vcpu);
+-- 
+1.8.3.2
+

@@ -1,0 +1,78 @@
+From fcd00ba3c240055f83247cdb49cb010ce7850518 Mon Sep 17 00:00:00 2001
+From: Yasser Shalabi <yassershalabi@gmail.com>
+Date: Wed, 19 Nov 2014 20:26:04 -0600
+Subject: [PATCH] adding syscall for trigger exit and noop syscall for sycall
+ overhead measurement
+
+---
+ Makefile                            |  2 +-
+ arch/x86/syscalls/syscall_64.tbl    |  2 ++
+ samples/trigger_exit/Makefile       |  1 +
+ samples/trigger_exit/trigger_exit.c | 21 +++++++++++++++++++++
+ 4 files changed, 25 insertions(+), 1 deletion(-)
+ create mode 100644 samples/trigger_exit/Makefile
+ create mode 100644 samples/trigger_exit/trigger_exit.c
+
+diff --git a/Makefile b/Makefile
+index 7feb3ad..51bd735 100644
+--- a/Makefile
++++ b/Makefile
+@@ -733,7 +733,7 @@ export mod_sign_cmd
+ 
+ 
+ ifeq ($(KBUILD_EXTMOD),)
+-core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
++core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ samples/trigger_exit/
+ 
+ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+ 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+index 38ae65d..0055c41 100644
+--- a/arch/x86/syscalls/syscall_64.tbl
++++ b/arch/x86/syscalls/syscall_64.tbl
+@@ -320,6 +320,8 @@
+ 311	64	process_vm_writev	sys_process_vm_writev
+ 312	common	kcmp			sys_kcmp
+ 313	common	finit_module		sys_finit_module
++314	64	trigger_exit		sys_trigger_exit
++315	64	dont_trigger_exit	sys_dont_trigger_exit
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/samples/trigger_exit/Makefile b/samples/trigger_exit/Makefile
+new file mode 100644
+index 0000000..c103451
+--- /dev/null
++++ b/samples/trigger_exit/Makefile
+@@ -0,0 +1 @@
++obj-y := trigger_exit.o
+diff --git a/samples/trigger_exit/trigger_exit.c b/samples/trigger_exit/trigger_exit.c
+new file mode 100644
+index 0000000..1f7823d
+--- /dev/null
++++ b/samples/trigger_exit/trigger_exit.c
+@@ -0,0 +1,21 @@
++#include <linux/syscalls.h>
++asmlinkage long sys_trigger_exit(unsigned x)
++{
++	register long rdx asm ("rdx");
++	//signal to realize this is a simulated vmexit
++	rdx = 0xdeadbeefFFFFffff;
++	//this will trigger a vmexit
++	asm("vmcall");
++	return 0;
++}
++//this syscall replaces vmcall with noops. its mainly to capture the overhead
++//of invoking a syscall on the guest
++asmlinkage long sys_dont_trigger_exit(unsigned x)
++{
++	register long rdx asm ("rdx");
++	rdx = 0xdeadbeefFFFFffff;
++	asm("nop");
++	asm("nop");
++	asm("nop");
++	return 0;
++}
+-- 
+1.8.3.2
+
